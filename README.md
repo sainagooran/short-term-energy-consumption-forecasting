@@ -53,24 +53,25 @@ Some consecutive observations are separated by two hours rather than one. The pr
 
 ```text
 Short-Term Energy Consumption Forecasting/
-│
 ├── data/
-│   └── AEP_hourly.csv
-│
+│   └── raw/
+│       └── AEP_hourly.csv
+├── notebooks/
+│   └── 01_exploratory_data_analysis.ipynb
+├── reports/
+│   ├── actual_vs_predicted.png
+│   ├── model_comparison.png
+│   ├── model_predictions.csv
+│   ├── model_results.csv
+│   ├── prediction_error_analysis.csv
+│   └── prediction_errors.png
 ├── src/
 │   ├── data_loader.py
+│   ├── inspect_timestamps.py
 │   └── train.py
-│
-├── reports/
-│   ├── model_results.csv
-│   ├── model_predictions.csv
-│   ├── prediction_error_analysis.csv
-│   ├── model_comparison.png
-│   ├── actual_vs_predicted.png
-│   └── prediction_errors.png
-│
-├── README.md
-└── requirements.txt
+├── .gitignore
+├── requirements.txt
+└── README.md
 ```
 
 *Note: The dataset location must match the path configured in `src/data_loader.py`. The structure above describes the main project files and generated reports.*
