@@ -165,22 +165,48 @@ X = df[features]
 y = df["Target"]
 
 
+
 # --------------------------------------------------
-# 7. Time-based train/test split
+# 7. Chronological Train/Test Split
 # --------------------------------------------------
 
 split_index = int(len(df) * 0.8)
+test_start_time = df.loc[split_index, "Datetime"]
 
-X_train = X.iloc[:split_index]
-X_test = X.iloc[split_index:]
+# Training targets must occur before the test period starts.
+train_mask = (
+    df["Datetime"] + pd.Timedelta(hours=1) < test_start_time
+)
 
-y_train = y.iloc[:split_index]
-y_test = y.iloc[split_index:]
+# Test predictions begin at the test period.
+test_mask = df["Datetime"] >= test_start_time
 
-print("\nTraining samples:", len(X_train))
-print("Testing samples:", len(X_test))
+X_train = X.loc[train_mask]
+X_test = X.loc[test_mask]
 
+y_train = y.loc[train_mask]
+y_test = y.loc[test_mask]
 
+# Each row's forecast origin and the hour being predicted
+test_origin_dates = (
+    df.loc[test_mask, "Datetime"].reset_index(drop=True)
+)
+target_dates = test_origin_dates + pd.Timedelta(hours=1)
+
+print("\n--- Chronological Train/Test Split ---")
+print(f"Test period starts: {test_start_time}")
+print(f"Training samples: {len(X_train)}")
+print(f"Testing samples: {len(X_test)}")
+
+last_training_target_time = (
+    df.loc[train_mask, "Datetime"].max()
+    + pd.Timedelta(hours=1)
+)
+
+print(f"Last training target time: {last_training_target_time}")
+
+assert last_training_target_time < test_start_time
+assert len(X_test) == len(y_test)
 # --------------------------------------------------
 # 8. Persistence baseline
 # --------------------------------------------------
@@ -330,9 +356,7 @@ plot_points = min(24 * 7, len(y_test))
 actual_values = y_test.iloc[:plot_points].to_numpy()
 predicted_values = gb_predictions[:plot_points]
 
-test_dates = df["Datetime"].iloc[
-    split_index:split_index + plot_points
-]
+test_dates = target_dates.iloc[:plot_points]
 
 fig, ax = plt.subplots(figsize=(14, 6))
 
@@ -435,7 +459,8 @@ print(f"Maximum Error: {np.max(all_errors):.2f} MW")
 # --------------------------------------------------
 
 error_analysis = pd.DataFrame({
-    "Datetime": df["Datetime"].iloc[split_index:].to_numpy(),
+    "Forecast_Origin_Datetime": test_origin_dates.to_numpy(),
+    "Target_Datetime": target_dates.to_numpy(),
     "Actual": y_test.to_numpy(),
     "Predicted": gb_predictions,
     "Error": all_errors,
@@ -451,7 +476,8 @@ print("\n--- 10 Largest Prediction Errors ---")
 print(
     worst_predictions[
         [
-            "Datetime",
+            "Forecast_Origin_Datetime",
+            "Target_Datetime",
             "Actual",
             "Predicted",
             "Error",
@@ -466,11 +492,11 @@ print(
 error_path = reports_dir / "prediction_error_analysis.csv"
 error_analysis.to_csv(error_path, index=False)
 
-# Save model predictions
 predictions_path = reports_dir / "model_predictions.csv"
 
 predictions_df = pd.DataFrame({
-    "Datetime": df["Datetime"].iloc[split_index:].to_numpy(),
+    "Forecast_Origin_Datetime": test_origin_dates.to_numpy(),
+    "Target_Datetime": target_dates.to_numpy(),
     "Actual": y_test.to_numpy(),
     "Persistence_Baseline": baseline_predictions.to_numpy(),
     "Random_Forest": rf_predictions,
@@ -480,8 +506,7 @@ predictions_df = pd.DataFrame({
 predictions_df.to_csv(predictions_path, index=False)
 
 print(f"Model predictions saved to: {predictions_path}")
-
-print(f"\nError analysis saved to: {error_path}")
+print(f"Error analysis saved to: {error_path}")
 
 
 # --------------------------------------------------
@@ -501,11 +526,12 @@ largest_changes = error_analysis.nlargest(
 print(
     largest_changes[
         [
-            "Datetime",
-            "Actual",
-            "Predicted",
-            "Actual_Change",
-            "Absolute_Error",
+           "Forecast_Origin_Datetime",
+        "Target_Datetime",
+        "Actual",
+        "Predicted",
+        "Actual_Change",
+        "Absolute_Error",
         ]
     ].to_string(
         index=False,
